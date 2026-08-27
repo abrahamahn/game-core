@@ -25,8 +25,8 @@ import {
   type GameTransition,
   type RandomSource,
   type RuleValidation,
-} from '../src/index.js';
-import { describe, expect, it } from 'vitest';
+} from "../src/index.js";
+import { describe, expect, it } from "vitest";
 
 interface State {
   readonly roster: ParticipantRoster;
@@ -35,11 +35,11 @@ interface State {
 }
 
 interface Action {
-  readonly kind: 'roll';
+  readonly kind: "roll";
 }
 
 interface Event {
-  readonly kind: 'rolled';
+  readonly kind: "rolled";
   readonly value: number;
 }
 
@@ -49,7 +49,7 @@ interface Outcome {
 }
 
 interface Rejection {
-  readonly code: 'MISSING_ACTOR' | 'INACTIVE_ACTOR';
+  readonly code: "MISSING_ACTOR" | "INACTIVE_ACTOR";
 }
 
 class Rules implements GameRules<State, Action, Event, Outcome, Rejection> {
@@ -58,10 +58,10 @@ class Rules implements GameRules<State, Action, Event, Outcome, Rejection> {
     state: Readonly<State>,
   ): RuleValidation<Rejection> {
     if (context.actor === undefined) {
-      return { accepted: false, rejection: { code: 'MISSING_ACTOR' } };
+      return { accepted: false, rejection: { code: "MISSING_ACTOR" } };
     }
     if (!state.roster.isActive(context.actor)) {
-      return { accepted: false, rejection: { code: 'INACTIVE_ACTOR' } };
+      return { accepted: false, rejection: { code: "INACTIVE_ACTOR" } };
     }
     return acceptAction();
   }
@@ -79,31 +79,35 @@ class Rules implements GameRules<State, Action, Event, Outcome, Rejection> {
       turns: state.turns + 1,
       total: state.total + value,
     };
-    const events = [{ kind: 'rolled', value }] as const;
+    const events = [{ kind: "rolled", value }] as const;
     return next.turns === 2
       ? finishGame(next, events, {
-          winner: context.actor?.toString() ?? '',
+          winner: context.actor?.toString() ?? "",
           total: next.total,
         })
       : continueGame(next, events);
   }
 }
 
-class MutatingRejectRules implements GameRules<State, Action, Event, Outcome, Rejection> {
+class MutatingRejectRules
+  implements GameRules<State, Action, Event, Outcome, Rejection>
+{
   public validate(
     _context: Readonly<ActionContext>,
     state: Readonly<State>,
   ): RuleValidation<Rejection> {
     (state as { turns: number }).turns = 99;
-    return { accepted: false, rejection: { code: 'MISSING_ACTOR' } };
+    return { accepted: false, rejection: { code: "MISSING_ACTOR" } };
   }
 
   public transition(): GameTransition<State, Event, Outcome> {
-    throw new Error('rejected actions never transition');
+    throw new Error("rejected actions never transition");
   }
 }
 
-class ThrowAfterRandomRules implements GameRules<State, Action, Event, Outcome, Rejection> {
+class ThrowAfterRandomRules
+  implements GameRules<State, Action, Event, Outcome, Rejection>
+{
   public validate(): RuleValidation<Rejection> {
     return acceptAction();
   }
@@ -115,19 +119,22 @@ class ThrowAfterRandomRules implements GameRules<State, Action, Event, Outcome, 
     random: RandomSource,
   ): GameTransition<State, Event, Outcome> {
     random.nextU64();
-    throw new Error('rule implementation failed after consuming randomness');
+    throw new Error("rule implementation failed after consuming randomness");
   }
 }
 
 function reference(): GameSessionRef {
-  return GameSessionRef.create(GameDefinitionRef.create('example.roll', 'rules-v1'), 'session-1');
+  return GameSessionRef.create(
+    GameDefinitionRef.create("example.roll", "rules-v1"),
+    "session-1",
+  );
 }
 
 function fixture(): {
   readonly state: State;
   readonly participant: ParticipantId;
 } {
-  const participant = ParticipantId.parse('participant-a');
+  const participant = ParticipantId.parse("participant-a");
   const roster = new ParticipantRoster();
   roster.join(participant);
   return { state: { roster, turns: 0, total: 0 }, participant };
@@ -142,18 +149,18 @@ const stateOwnership: GameStateOwnership<State, Outcome> = {
   cloneOutcome: (outcome) => ({ ...outcome }),
 };
 
-describe('identity and participant lifecycle', () => {
-  it('validates canonical identifiers', () => {
-    expect(GameDefinitionKey.parse('board.strategy.standard').toString()).toBe(
-      'board.strategy.standard',
+describe("identity and participant lifecycle", () => {
+  it("validates canonical identifiers", () => {
+    expect(GameDefinitionKey.parse("board.strategy.standard").toString()).toBe(
+      "board.strategy.standard",
     );
-    expect(() => GameDefinitionKey.parse('Board/Strategy')).toThrow(
-      expect.objectContaining({ code: 'GAME_INVALID_DEFINITION_KEY' }),
+    expect(() => GameDefinitionKey.parse("Board/Strategy")).toThrow(
+      expect.objectContaining({ code: "GAME_INVALID_DEFINITION_KEY" }),
     );
   });
 
-  it('preserves a participant after leaving and rejects impossible transitions', () => {
-    const participant = ParticipantId.parse('participant-a');
+  it("preserves a participant after leaving and rejects impossible transitions", () => {
+    const participant = ParticipantId.parse("participant-a");
     const roster = new ParticipantRoster();
     roster.join(participant);
     expect(roster.isActive(participant)).toBe(true);
@@ -161,59 +168,70 @@ describe('identity and participant lifecycle', () => {
       roster.join(participant);
     }).toThrow(ParticipantError);
     roster.leave(participant);
-    expect(roster.get(participant)?.status).toBe('left');
+    expect(roster.get(participant)?.status).toBe("left");
     expect(() => {
       roster.leave(participant);
     }).toThrow(
-      expect.objectContaining({ code: 'GAME_PARTICIPANT_ALREADY_LEFT' }),
+      expect.objectContaining({ code: "GAME_PARTICIPANT_ALREADY_LEFT" }),
     );
     const existing = roster.get(participant);
-    if (existing === undefined) throw new Error('expected participant');
+    if (existing === undefined) throw new Error("expected participant");
     expect(() => new ParticipantRoster([existing, existing])).toThrow(
-      expect.objectContaining({ code: 'GAME_PARTICIPANT_ALREADY_EXISTS' }),
+      expect.objectContaining({ code: "GAME_PARTICIPANT_ALREADY_EXISTS" }),
     );
   });
 });
 
-describe('authoritative execution', () => {
-  it('applies valid actions, emits events, versions state, and finishes once', () => {
+describe("authoritative execution", () => {
+  it("applies valid actions, emits events, versions state, and finishes once", () => {
     const { state, participant } = fixture();
-    const session = GameSession.create<State, Outcome>(reference(), state, stateOwnership);
+    const session = GameSession.create<State, Outcome>(
+      reference(),
+      state,
+      stateOwnership,
+    );
     expect(session.start(GameVersion.ZERO).value).toBe(1);
     const random = new SeededRandom(RandomSeed.from(42));
     const first = session.apply(
       new Rules(),
-      new GameAction(GameVersion.from(1), participant, { kind: 'roll' }),
+      new GameAction(GameVersion.from(1), participant, { kind: "roll" }),
       random,
     );
     const second = session.apply(
       new Rules(),
-      new GameAction(GameVersion.from(2), participant, { kind: 'roll' }),
+      new GameAction(GameVersion.from(2), participant, { kind: "roll" }),
       random,
     );
 
     expect(first.events).toHaveLength(1);
-    expect(second.status).toBe('finished');
+    expect(second.status).toBe("finished");
     expect(session.version.value).toBe(3);
-    expect(session.outcome?.winner).toBe('participant-a');
+    expect(session.outcome?.winner).toBe("participant-a");
     let failure: unknown;
     try {
       session.apply(
         new Rules(),
-        new GameAction(GameVersion.from(3), participant, { kind: 'roll' }),
+        new GameAction(GameVersion.from(3), participant, { kind: "roll" }),
         random,
       );
     } catch (error: unknown) {
       failure = error;
     }
     expect(failure).toBeInstanceOf(GameExecutionError);
-    if (!(failure instanceof GameExecutionError)) throw new Error('expected execution error');
-    expect(failure.sessionError?.code).toBe('GAME_INVALID_LIFECYCLE_TRANSITION');
+    if (!(failure instanceof GameExecutionError))
+      throw new Error("expected execution error");
+    expect(failure.sessionError?.code).toBe(
+      "GAME_INVALID_LIFECYCLE_TRANSITION",
+    );
   });
 
-  it('rejects stale and illegal actions without mutating state or consuming randomness', () => {
+  it("rejects stale and illegal actions without mutating state or consuming randomness", () => {
     const { state } = fixture();
-    const session = GameSession.create<State, Outcome>(reference(), state, stateOwnership);
+    const session = GameSession.create<State, Outcome>(
+      reference(),
+      state,
+      stateOwnership,
+    );
     session.start(GameVersion.ZERO);
     const random = new SeededRandom(RandomSeed.from(8));
     const pristine = new SeededRandom(RandomSeed.from(8));
@@ -221,31 +239,43 @@ describe('authoritative execution', () => {
     expect(() =>
       session.apply(
         new Rules(),
-        new GameAction(GameVersion.ZERO, undefined, { kind: 'roll' }),
+        new GameAction(GameVersion.ZERO, undefined, { kind: "roll" }),
         random,
       ),
     ).toThrow(GameExecutionError);
     expect(() =>
       session.apply(
         new Rules(),
-        new GameAction(GameVersion.from(1), undefined, { kind: 'roll' }),
+        new GameAction(GameVersion.from(1), undefined, { kind: "roll" }),
         random,
       ),
-    ).toThrow(expect.objectContaining({ rejection: { code: 'MISSING_ACTOR' } }));
+    ).toThrow(
+      expect.objectContaining({ rejection: { code: "MISSING_ACTOR" } }),
+    );
     expect(session.state.turns).toBe(0);
     expect(random.nextU64()).toBe(pristine.nextU64());
   });
 
-  it('rejects snapshots with impossible lifecycle facts', () => {
+  it("rejects snapshots with impossible lifecycle facts", () => {
     const { state } = fixture();
     expect(() =>
-      GameSnapshot.create(reference(), GameVersion.from(7), 'created', state, undefined),
+      GameSnapshot.create(
+        reference(),
+        GameVersion.from(7),
+        "created",
+        state,
+        undefined,
+      ),
     ).toThrow(SessionError);
   });
 
-  it('owns state across caller, getter, and rejecting-validator mutations', () => {
+  it("owns state across caller, getter, and rejecting-validator mutations", () => {
     const { state, participant } = fixture();
-    const session = GameSession.create<State, Outcome>(reference(), state, stateOwnership);
+    const session = GameSession.create<State, Outcome>(
+      reference(),
+      state,
+      stateOwnership,
+    );
     (state as { turns: number }).turns = 40;
     const exposed = session.state;
     (exposed as { turns: number }).turns = 50;
@@ -255,16 +285,20 @@ describe('authoritative execution', () => {
     expect(() =>
       session.apply(
         new MutatingRejectRules(),
-        new GameAction(GameVersion.from(1), participant, { kind: 'roll' }),
+        new GameAction(GameVersion.from(1), participant, { kind: "roll" }),
         new SeededRandom(RandomSeed.from(1)),
       ),
     ).toThrow(GameExecutionError);
     expect(session.state.turns).toBe(0);
   });
 
-  it('restores checkpointable randomness when transition execution throws', () => {
+  it("restores checkpointable randomness when transition execution throws", () => {
     const { state, participant } = fixture();
-    const session = GameSession.create<State, Outcome>(reference(), state, stateOwnership);
+    const session = GameSession.create<State, Outcome>(
+      reference(),
+      state,
+      stateOwnership,
+    );
     session.start(GameVersion.ZERO);
     const random = new SeededRandom(RandomSeed.from(77));
     const pristine = new SeededRandom(RandomSeed.from(77));
@@ -272,7 +306,7 @@ describe('authoritative execution', () => {
     expect(() =>
       session.apply(
         new ThrowAfterRandomRules(),
-        new GameAction(GameVersion.from(1), participant, { kind: 'roll' }),
+        new GameAction(GameVersion.from(1), participant, { kind: "roll" }),
         random,
       ),
     ).toThrow(/failed after consuming randomness/u);
@@ -282,27 +316,29 @@ describe('authoritative execution', () => {
   });
 });
 
-describe('deterministic randomness and replay', () => {
-  it('pins the seeded algorithm and cross-language stream', () => {
-    expect(SEEDED_RANDOM_ALGORITHM).toBe('splitmix64-v1');
+describe("deterministic randomness and replay", () => {
+  it("pins the seeded algorithm and cross-language stream", () => {
+    expect(SEEDED_RANDOM_ALGORITHM).toBe("splitmix64-v1");
     const random = new SeededRandom(RandomSeed.from(0));
     expect(random.nextU64()).toBe(0xe220_a839_7b1d_cdafn);
     expect(random.nextU64()).toBe(0x6e78_9e6a_a1b9_65f4n);
     expect(random.nextU64()).toBe(0x06c4_5d18_8009_454fn);
     expect(() => random.nextIndex(0)).toThrow(
-      expect.objectContaining({ code: 'GAME_RANDOM_EMPTY_RANGE' }),
+      expect.objectContaining({ code: "GAME_RANDOM_EMPTY_RANGE" }),
     );
-    expect(() => RandomSeed.from(Number.MAX_SAFE_INTEGER + 1)).toThrow(RangeError);
+    expect(() => RandomSeed.from(Number.MAX_SAFE_INTEGER + 1)).toThrow(
+      RangeError,
+    );
   });
 
-  it('reconstructs identical state, outcomes, and events and continues snapshots', () => {
+  it("reconstructs identical state, outcomes, and events and continues snapshots", () => {
     const { state, participant } = fixture();
     const actions = [
       new GameAction(GameVersion.from(1), participant, {
-        kind: 'roll',
+        kind: "roll",
       } as const),
       new GameAction(GameVersion.from(2), participant, {
-        kind: 'roll',
+        kind: "roll",
       } as const),
     ];
     const first = replay(
@@ -343,7 +379,7 @@ describe('deterministic randomness and replay', () => {
       actions.slice(1),
       random,
     );
-    expect(restored.session.status).toBe('finished');
+    expect(restored.session.status).toBe("finished");
     expect(restored.session.version.value).toBe(3);
   });
 });

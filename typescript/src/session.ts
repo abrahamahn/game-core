@@ -1,9 +1,9 @@
-import type { GameSessionRef } from './identity.js';
-import type { ParticipantId } from './participant.js';
-import type { RandomSource, TransactionalRandomSource } from './randomness.js';
+import type { GameSessionRef } from "./identity.js";
+import type { ParticipantId } from "./participant.js";
+import type { RandomSource, TransactionalRandomSource } from "./randomness.js";
 
-export type GameStatus = 'created' | 'active' | 'finished';
-export type LifecycleOperation = 'start' | 'apply_action';
+export type GameStatus = "created" | "active" | "finished";
+export type LifecycleOperation = "start" | "apply_action";
 
 export class GameVersion {
   public static readonly ZERO = new GameVersion(0);
@@ -12,7 +12,7 @@ export class GameVersion {
 
   public static from(value: number): GameVersion {
     if (!Number.isSafeInteger(value) || value < 0) {
-      throw new RangeError('Game version must be a non-negative safe integer');
+      throw new RangeError("Game version must be a non-negative safe integer");
     }
     return value === 0 ? GameVersion.ZERO : new GameVersion(value);
   }
@@ -23,7 +23,7 @@ export class GameVersion {
 
   public next(): GameVersion {
     if (this.value === Number.MAX_SAFE_INTEGER) {
-      throw new SessionError('GAME_VERSION_EXHAUSTED');
+      throw new SessionError("GAME_VERSION_EXHAUSTED");
     }
     return GameVersion.from(this.value + 1);
   }
@@ -56,18 +56,20 @@ export function acceptAction(): RuleValidation<never> {
   return { accepted: true };
 }
 
-export function rejectAction<Rejection>(rejection: Rejection): RuleValidation<Rejection> {
+export function rejectAction<Rejection>(
+  rejection: Rejection,
+): RuleValidation<Rejection> {
   return { accepted: false, rejection };
 }
 
 export type GameTransition<State, Event, Outcome> =
   | {
-      readonly kind: 'continue';
+      readonly kind: "continue";
       readonly state: State;
       readonly events: readonly Event[];
     }
   | {
-      readonly kind: 'finish';
+      readonly kind: "finish";
       readonly state: State;
       readonly events: readonly Event[];
       readonly outcome: Outcome;
@@ -77,7 +79,7 @@ export function continueGame<State, Event, Outcome = never>(
   state: State,
   events: readonly Event[],
 ): GameTransition<State, Event, Outcome> {
-  return { kind: 'continue', state, events };
+  return { kind: "continue", state, events };
 }
 
 export function finishGame<State, Event, Outcome>(
@@ -85,7 +87,7 @@ export function finishGame<State, Event, Outcome>(
   events: readonly Event[],
   outcome: Outcome,
 ): GameTransition<State, Event, Outcome> {
-  return { kind: 'finish', state, events, outcome };
+  return { kind: "finish", state, events, outcome };
 }
 
 export interface GameRules<State, Action, Event, Outcome, Rejection> {
@@ -134,7 +136,8 @@ export class GameSession<State, Outcome> {
     this.#status = status;
     this.#ownership = ownership;
     this.#state = ownership.cloneState(state);
-    this.#outcome = outcome === undefined ? undefined : ownership.cloneOutcome(outcome);
+    this.#outcome =
+      outcome === undefined ? undefined : ownership.cloneOutcome(outcome);
   }
 
   public static create<State, Outcome = never>(
@@ -145,7 +148,7 @@ export class GameSession<State, Outcome> {
     return new GameSession<State, Outcome>(
       reference,
       GameVersion.ZERO,
-      'created',
+      "created",
       initialState,
       undefined,
       ownership,
@@ -180,17 +183,19 @@ export class GameSession<State, Outcome> {
   }
 
   public get outcome(): Readonly<Outcome> | undefined {
-    return this.#outcome === undefined ? undefined : this.#ownership.cloneOutcome(this.#outcome);
+    return this.#outcome === undefined
+      ? undefined
+      : this.#ownership.cloneOutcome(this.#outcome);
   }
 
   public start(expectedVersion: GameVersion): GameVersion {
     this.ensureVersion(expectedVersion);
-    if (this.#status !== 'created') {
-      throw SessionError.invalidLifecycle(this.#status, 'start');
+    if (this.#status !== "created") {
+      throw SessionError.invalidLifecycle(this.#status, "start");
     }
     const nextVersion = this.#version.next();
     this.#version = nextVersion;
-    this.#status = 'active';
+    this.#status = "active";
     return nextVersion;
   }
 
@@ -201,8 +206,8 @@ export class GameSession<State, Outcome> {
   ): AppliedTransition<Event> {
     try {
       this.ensureVersion(action.expectedVersion);
-      if (this.#status !== 'active') {
-        throw SessionError.invalidLifecycle(this.#status, 'apply_action');
+      if (this.#status !== "active") {
+        throw SessionError.invalidLifecycle(this.#status, "apply_action");
       }
       const nextVersion = this.#version.next();
       const context: ActionContext = {
@@ -231,7 +236,7 @@ export class GameSession<State, Outcome> {
         );
         ownedState = this.#ownership.cloneState(transition.state);
         ownedOutcome =
-          transition.kind === 'finish'
+          transition.kind === "finish"
             ? this.#ownership.cloneOutcome(transition.outcome)
             : undefined;
       } catch (error: unknown) {
@@ -241,9 +246,9 @@ export class GameSession<State, Outcome> {
       const priorVersion = this.#version;
       this.#state = ownedState;
       this.#version = nextVersion;
-      if (transition.kind === 'finish') {
+      if (transition.kind === "finish") {
         this.#outcome = ownedOutcome;
-        this.#status = 'finished';
+        this.#status = "finished";
       }
       return {
         priorVersion,
@@ -253,7 +258,8 @@ export class GameSession<State, Outcome> {
       };
     } catch (error: unknown) {
       if (error instanceof GameExecutionError) throw error;
-      if (error instanceof SessionError) throw GameExecutionError.session(error);
+      if (error instanceof SessionError)
+        throw GameExecutionError.session(error);
       throw error;
     }
   }
@@ -264,7 +270,9 @@ export class GameSession<State, Outcome> {
       this.#version,
       this.#status,
       this.#ownership.cloneState(this.#state),
-      this.#outcome === undefined ? undefined : this.#ownership.cloneOutcome(this.#outcome),
+      this.#outcome === undefined
+        ? undefined
+        : this.#ownership.cloneOutcome(this.#outcome),
     );
   }
 
@@ -291,28 +299,40 @@ export class GameSnapshot<State, Outcome> {
     state: State,
     outcome: Outcome | undefined,
   ): GameSnapshot<State, Outcome> {
-    const snapshot = new GameSnapshot(reference, version, status, state, outcome);
+    const snapshot = new GameSnapshot(
+      reference,
+      version,
+      status,
+      state,
+      outcome,
+    );
     snapshot.validate();
     return snapshot;
   }
 
   public validate(): void {
     const valid =
-      (this.status === 'created' && this.version.value === 0 && this.outcome === undefined) ||
-      (this.status === 'active' && this.version.value > 0 && this.outcome === undefined) ||
-      (this.status === 'finished' && this.version.value > 1 && this.outcome !== undefined);
-    if (!valid) throw new SessionError('GAME_INVALID_SNAPSHOT');
+      (this.status === "created" &&
+        this.version.value === 0 &&
+        this.outcome === undefined) ||
+      (this.status === "active" &&
+        this.version.value > 0 &&
+        this.outcome === undefined) ||
+      (this.status === "finished" &&
+        this.version.value > 1 &&
+        this.outcome !== undefined);
+    if (!valid) throw new SessionError("GAME_INVALID_SNAPSHOT");
   }
 }
 
 export type SessionErrorCode =
-  | 'GAME_VERSION_CONFLICT'
-  | 'GAME_INVALID_LIFECYCLE_TRANSITION'
-  | 'GAME_VERSION_EXHAUSTED'
-  | 'GAME_INVALID_SNAPSHOT';
+  | "GAME_VERSION_CONFLICT"
+  | "GAME_INVALID_LIFECYCLE_TRANSITION"
+  | "GAME_VERSION_EXHAUSTED"
+  | "GAME_INVALID_SNAPSHOT";
 
 export class SessionError extends Error {
-  public override readonly name = 'SessionError';
+  public override readonly name = "SessionError";
 
   public constructor(
     public readonly code: SessionErrorCode,
@@ -321,15 +341,21 @@ export class SessionError extends Error {
     super(code);
   }
 
-  public static versionConflict(expected: GameVersion, actual: GameVersion): SessionError {
-    return new SessionError('GAME_VERSION_CONFLICT', {
+  public static versionConflict(
+    expected: GameVersion,
+    actual: GameVersion,
+  ): SessionError {
+    return new SessionError("GAME_VERSION_CONFLICT", {
       expected: expected.value,
       actual: actual.value,
     });
   }
 
-  public static invalidLifecycle(status: GameStatus, operation: LifecycleOperation): SessionError {
-    return new SessionError('GAME_INVALID_LIFECYCLE_TRANSITION', {
+  public static invalidLifecycle(
+    status: GameStatus,
+    operation: LifecycleOperation,
+  ): SessionError {
+    return new SessionError("GAME_INVALID_LIFECYCLE_TRANSITION", {
       status,
       operation,
     });
@@ -337,20 +363,22 @@ export class SessionError extends Error {
 }
 
 export class GameExecutionError<Rejection> extends Error {
-  public override readonly name = 'GameExecutionError';
+  public override readonly name = "GameExecutionError";
 
   private constructor(
     public readonly sessionError: SessionError | undefined,
     public readonly rejection: Rejection | undefined,
   ) {
-    super(sessionError?.code ?? 'GAME_ACTION_REJECTED');
+    super(sessionError?.code ?? "GAME_ACTION_REJECTED");
   }
 
   public static session(error: SessionError): GameExecutionError<never> {
     return new GameExecutionError<never>(error, undefined);
   }
 
-  public static rejected<Rejection>(rejection: Rejection): GameExecutionError<Rejection> {
+  public static rejected<Rejection>(
+    rejection: Rejection,
+  ): GameExecutionError<Rejection> {
     return new GameExecutionError(undefined, rejection);
   }
 }

@@ -1,13 +1,13 @@
 const MAX_PARTICIPANT_ID_LENGTH = 160;
 
 export type ParticipantErrorCode =
-  | 'GAME_INVALID_PARTICIPANT_ID'
-  | 'GAME_PARTICIPANT_ALREADY_EXISTS'
-  | 'GAME_PARTICIPANT_NOT_FOUND'
-  | 'GAME_PARTICIPANT_ALREADY_LEFT';
+  | "GAME_INVALID_PARTICIPANT_ID"
+  | "GAME_PARTICIPANT_ALREADY_EXISTS"
+  | "GAME_PARTICIPANT_NOT_FOUND"
+  | "GAME_PARTICIPANT_ALREADY_LEFT";
 
 export class ParticipantError extends Error {
-  public override readonly name = 'ParticipantError';
+  public override readonly name = "ParticipantError";
 
   public constructor(public readonly code: ParticipantErrorCode) {
     super(code);
@@ -24,7 +24,7 @@ export class ParticipantId {
       value.trim() !== value ||
       /[\u0000-\u001f\u007f]/.test(value)
     ) {
-      throw new ParticipantError('GAME_INVALID_PARTICIPANT_ID');
+      throw new ParticipantError("GAME_INVALID_PARTICIPANT_ID");
     }
     return new ParticipantId(value);
   }
@@ -34,16 +34,16 @@ export class ParticipantId {
   }
 }
 
-export type ParticipantStatus = 'active' | 'left';
+export type ParticipantStatus = "active" | "left";
 
 export class Participant {
   public constructor(
     public readonly id: ParticipantId,
-    public readonly status: ParticipantStatus = 'active',
+    public readonly status: ParticipantStatus = "active",
   ) {}
 
   public get isActive(): boolean {
-    return this.status === 'active';
+    return this.status === "active";
   }
 }
 
@@ -55,7 +55,7 @@ export class ParticipantRoster {
     for (const participant of participants) {
       const key = participant.id.toString();
       if (this.#participants.has(key)) {
-        throw new ParticipantError('GAME_PARTICIPANT_ALREADY_EXISTS');
+        throw new ParticipantError("GAME_PARTICIPANT_ALREADY_EXISTS");
       }
       this.#participants.set(key, participant);
     }
@@ -64,7 +64,7 @@ export class ParticipantRoster {
   public join(id: ParticipantId): void {
     const key = id.toString();
     if (this.#participants.has(key)) {
-      throw new ParticipantError('GAME_PARTICIPANT_ALREADY_EXISTS');
+      throw new ParticipantError("GAME_PARTICIPANT_ALREADY_EXISTS");
     }
     this.#participants.set(key, new Participant(id));
   }
@@ -73,12 +73,12 @@ export class ParticipantRoster {
     const key = id.toString();
     const participant = this.#participants.get(key);
     if (participant === undefined) {
-      throw new ParticipantError('GAME_PARTICIPANT_NOT_FOUND');
+      throw new ParticipantError("GAME_PARTICIPANT_NOT_FOUND");
     }
     if (!participant.isActive) {
-      throw new ParticipantError('GAME_PARTICIPANT_ALREADY_LEFT');
+      throw new ParticipantError("GAME_PARTICIPANT_ALREADY_LEFT");
     }
-    this.#participants.set(key, new Participant(id, 'left'));
+    this.#participants.set(key, new Participant(id, "left"));
   }
 
   public get(id: ParticipantId): Participant | undefined {

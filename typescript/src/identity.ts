@@ -1,14 +1,14 @@
 const MAX_REFERENCE_LENGTH = 160;
 
 export type IdentityErrorCode =
-  | 'GAME_INVALID_DEFINITION_KEY'
-  | 'GAME_INVALID_DEFINITION_VERSION'
-  | 'GAME_INVALID_SESSION_ID'
-  | 'GAME_INVALID_RESULT_ID'
-  | 'GAME_INVALID_RESULT_VERSION';
+  | "GAME_INVALID_DEFINITION_KEY"
+  | "GAME_INVALID_DEFINITION_VERSION"
+  | "GAME_INVALID_SESSION_ID"
+  | "GAME_INVALID_RESULT_ID"
+  | "GAME_INVALID_RESULT_VERSION";
 
 export class IdentityError extends Error {
-  public override readonly name = 'IdentityError';
+  public override readonly name = "IdentityError";
 
   public constructor(public readonly code: IdentityErrorCode) {
     super(code);
@@ -20,7 +20,7 @@ export class GameDefinitionKey {
 
   public static parse(value: string): GameDefinitionKey {
     if (!isDefinitionKey(value)) {
-      throw new IdentityError('GAME_INVALID_DEFINITION_KEY');
+      throw new IdentityError("GAME_INVALID_DEFINITION_KEY");
     }
     return new GameDefinitionKey(value);
   }
@@ -35,7 +35,7 @@ export class GameDefinitionVersion {
 
   public static parse(value: string): GameDefinitionVersion {
     if (!isVersion(value)) {
-      throw new IdentityError('GAME_INVALID_DEFINITION_VERSION');
+      throw new IdentityError("GAME_INVALID_DEFINITION_VERSION");
     }
     return new GameDefinitionVersion(value);
   }
@@ -64,7 +64,7 @@ export class GameSessionId {
 
   public static parse(value: string): GameSessionId {
     if (!isReferenceId(value)) {
-      throw new IdentityError('GAME_INVALID_SESSION_ID');
+      throw new IdentityError("GAME_INVALID_SESSION_ID");
     }
     return new GameSessionId(value);
   }
@@ -80,7 +80,10 @@ export class GameSessionRef {
     public readonly sessionId: GameSessionId,
   ) {}
 
-  public static create(definition: GameDefinitionRef, sessionId: string): GameSessionRef {
+  public static create(
+    definition: GameDefinitionRef,
+    sessionId: string,
+  ): GameSessionRef {
     return new GameSessionRef(definition, GameSessionId.parse(sessionId));
   }
 }
@@ -90,7 +93,7 @@ export class GameResultId {
 
   public static parse(value: string): GameResultId {
     if (!isReferenceId(value)) {
-      throw new IdentityError('GAME_INVALID_RESULT_ID');
+      throw new IdentityError("GAME_INVALID_RESULT_ID");
     }
     return new GameResultId(value);
   }
@@ -107,9 +110,13 @@ export class GameResultRef {
     public readonly version: number,
   ) {}
 
-  public static create(session: GameSessionRef, resultId: string, version: number): GameResultRef {
+  public static create(
+    session: GameSessionRef,
+    resultId: string,
+    version: number,
+  ): GameResultRef {
     if (!Number.isSafeInteger(version) || version <= 0) {
-      throw new IdentityError('GAME_INVALID_RESULT_VERSION');
+      throw new IdentityError("GAME_INVALID_RESULT_VERSION");
     }
     return new GameResultRef(session, GameResultId.parse(resultId), version);
   }
@@ -117,12 +124,14 @@ export class GameResultRef {
 
 function isDefinitionKey(value: string): boolean {
   if (value.length === 0 || value.length > MAX_REFERENCE_LENGTH) return false;
-  return value.split('.').every((segment) => /^[a-z][a-z0-9_]*$/.test(segment));
+  return value.split(".").every((segment) => /^[a-z][a-z0-9_]*$/.test(segment));
 }
 
 function isVersion(value: string): boolean {
   return (
-    value.length > 0 && value.length <= MAX_REFERENCE_LENGTH && /^[A-Za-z0-9._-]+$/.test(value)
+    value.length > 0 &&
+    value.length <= MAX_REFERENCE_LENGTH &&
+    /^[A-Za-z0-9._-]+$/.test(value)
   );
 }
 
