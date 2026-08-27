@@ -3,6 +3,10 @@
 The TypeScript implementation of `game-core` provides deterministic, authoritative game-session
 primitives without prescribing a concrete game, server, database, protocol, or UI.
 
+The package supplies reusable mechanics, not a universal game bounded context. Use its lifecycle
+only where a concrete occurrence genuinely shares that meaning; Blackjack, Baccarat, Poker,
+Rooms, tournaments, fairness provenance, settlement, and presentation keep their own authority.
+
 It owns validated identities, a strict session lifecycle, optimistic versions, generic participant
 presence, the `GameRules` execution boundary, ordered events, terminal outcomes, injected seeded
 randomness, snapshots, restoration, and replay. Concrete turns, rounds, phases, roles, legal moves,

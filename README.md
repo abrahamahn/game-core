@@ -19,4 +19,18 @@ Neither implementation contains a particular game's rules or depends on an appli
 framework, database, transport, cloud, or user interface. Each folder can be copied or checked
 out and built without the other implementation.
 
+## Reuse boundary
+
+`game-core` is a mechanics package, not a universal semantic Game bounded context. Adopt a
+primitive only where real consumers share its meaning and failure contract. In particular, the
+three-state session wrapper is appropriate only for occurrences that genuinely follow that
+lifecycle; it must not flatten Blackjack hands, Baccarat shoes/coups, Poker tables/hands, Rooms,
+tournaments, settlement, fairness provenance, or presentation into one generic aggregate.
+
+Concrete game domains remain authoritative for their rules profiles, actions, state, results,
+corrections, visibility, and history facts. Applications remain authoritative for command
+receipts/idempotency, durable deadlines, storage transactions, fairness protocols, value movement,
+and transport. This boundary lets Ganbate reuse deterministic mechanics without turning shared
+code into a shared semantic owner.
+
 See each package README for its API, example, extension points, and validation commands.

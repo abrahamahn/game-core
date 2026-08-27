@@ -7,8 +7,11 @@ export type LifecycleOperation = "start" | "apply_action";
 
 export class GameVersion {
   public static readonly ZERO = new GameVersion(0);
+  public static readonly MAX_SAFE = new GameVersion(Number.MAX_SAFE_INTEGER);
 
-  private constructor(public readonly value: number) {}
+  private constructor(public readonly value: number) {
+    Object.freeze(this);
+  }
 
   public static from(value: number): GameVersion {
     if (!Number.isSafeInteger(value) || value < 0) {
@@ -22,7 +25,7 @@ export class GameVersion {
   }
 
   public next(): GameVersion {
-    if (this.value === Number.MAX_SAFE_INTEGER) {
+    if (this.equals(GameVersion.MAX_SAFE)) {
       throw new SessionError("GAME_VERSION_EXHAUSTED");
     }
     return GameVersion.from(this.value + 1);
@@ -34,7 +37,9 @@ export class GameAction<Action> {
     public readonly expectedVersion: GameVersion,
     public readonly actor: ParticipantId | undefined,
     public readonly payload: Action,
-  ) {}
+  ) {
+    Object.freeze(this);
+  }
 }
 
 export interface ActionContext {
@@ -118,6 +123,7 @@ export interface AppliedTransition<Event> {
 }
 
 export class GameSession<State, Outcome> {
+  readonly #reference: GameSessionRef;
   #version: GameVersion;
   #status: GameStatus;
   #state: State;
@@ -125,13 +131,14 @@ export class GameSession<State, Outcome> {
   readonly #ownership: GameStateOwnership<State, Outcome>;
 
   private constructor(
-    public readonly reference: GameSessionRef,
+    reference: GameSessionRef,
     version: GameVersion,
     status: GameStatus,
     state: State,
     outcome: Outcome | undefined,
     ownership: GameStateOwnership<State, Outcome>,
   ) {
+    this.#reference = reference;
     this.#version = version;
     this.#status = status;
     this.#ownership = ownership;
@@ -172,6 +179,10 @@ export class GameSession<State, Outcome> {
 
   public get version(): GameVersion {
     return this.#version;
+  }
+
+  public get reference(): GameSessionRef {
+    return this.#reference;
   }
 
   public get status(): GameStatus {
@@ -250,12 +261,12 @@ export class GameSession<State, Outcome> {
         this.#outcome = ownedOutcome;
         this.#status = "finished";
       }
-      return {
+      return Object.freeze({
         priorVersion,
         nextVersion,
         status: this.#status,
-        events: transition.events,
-      };
+        events: Object.freeze([...transition.events]),
+      });
     } catch (error: unknown) {
       if (error instanceof GameExecutionError) throw error;
       if (error instanceof SessionError)
@@ -290,7 +301,9 @@ export class GameSnapshot<State, Outcome> {
     public readonly status: GameStatus,
     public readonly state: State,
     public readonly outcome: Outcome | undefined,
-  ) {}
+  ) {
+    Object.freeze(this);
+  }
 
   public static create<State, Outcome>(
     reference: GameSessionRef,

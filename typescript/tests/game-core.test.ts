@@ -6,6 +6,7 @@ import {
   GameDefinitionKey,
   GameDefinitionRef,
   GameExecutionError,
+  GameResultRef,
   GameSession,
   GameSessionRef,
   GameSnapshot,
@@ -157,6 +158,38 @@ describe("identity and participant lifecycle", () => {
     expect(() => GameDefinitionKey.parse("Board/Strategy")).toThrow(
       expect.objectContaining({ code: "GAME_INVALID_DEFINITION_KEY" }),
     );
+
+    const unicodeReference = GameSessionRef.create(
+      GameDefinitionRef.create("board.strategy", "v1"),
+      "🂡".repeat(160),
+    );
+    expect(Array.from(unicodeReference.sessionId.toString())).toHaveLength(160);
+    expect(() =>
+      GameSessionRef.create(
+        GameDefinitionRef.create("board.strategy", "v1"),
+        "🂡".repeat(161),
+      ),
+    ).toThrow(expect.objectContaining({ code: "GAME_INVALID_SESSION_ID" }));
+    expect(() =>
+      GameSessionRef.create(
+        GameDefinitionRef.create("board.strategy", "v1"),
+        "session\u0085control",
+      ),
+    ).toThrow(expect.objectContaining({ code: "GAME_INVALID_SESSION_ID" }));
+
+    expect(
+      GameResultRef.create(reference(), "result-1", Number.MAX_SAFE_INTEGER)
+        .version,
+    ).toBe(Number.MAX_SAFE_INTEGER);
+    expect(() =>
+      GameResultRef.create(
+        reference(),
+        "result-1",
+        Number.MAX_SAFE_INTEGER + 1,
+      ),
+    ).toThrow(
+      expect.objectContaining({ code: "GAME_INVALID_RESULT_VERSION" }),
+    );
   });
 
   it("preserves a participant after leaving and rejects impossible transitions", () => {
@@ -178,6 +211,15 @@ describe("identity and participant lifecycle", () => {
     if (existing === undefined) throw new Error("expected participant");
     expect(() => new ParticipantRoster([existing, existing])).toThrow(
       expect.objectContaining({ code: "GAME_PARTICIPANT_ALREADY_EXISTS" }),
+    );
+    expect(ParticipantId.parse("🂡".repeat(160)).toString()).toBe(
+      "🂡".repeat(160),
+    );
+    expect(() => ParticipantId.parse("🂡".repeat(161))).toThrow(
+      expect.objectContaining({ code: "GAME_INVALID_PARTICIPANT_ID" }),
+    );
+    expect(() => ParticipantId.parse("participant\u0085control")).toThrow(
+      expect.objectContaining({ code: "GAME_INVALID_PARTICIPANT_ID" }),
     );
   });
 });
@@ -267,6 +309,9 @@ describe("authoritative execution", () => {
         undefined,
       ),
     ).toThrow(SessionError);
+    expect(() => GameVersion.MAX_SAFE.next()).toThrow(
+      expect.objectContaining({ code: "GAME_VERSION_EXHAUSTED" }),
+    );
   });
 
   it("owns state across caller, getter, and rejecting-validator mutations", () => {
@@ -276,6 +321,15 @@ describe("authoritative execution", () => {
       state,
       stateOwnership,
     );
+    expect(Object.isFrozen(session.reference)).toBe(true);
+    expect(Object.isFrozen(session.version)).toBe(true);
+    expect(Reflect.set(session, "reference", reference())).toBe(false);
+    const rosterParticipant = state.roster.get(participant);
+    if (rosterParticipant === undefined) throw new Error("expected participant");
+    expect(Object.isFrozen(rosterParticipant)).toBe(true);
+    expect(Reflect.set(rosterParticipant, "status", "left")).toBe(false);
+    expect(Reflect.set(session.version, "value", 99)).toBe(false);
+    expect(session.version.value).toBe(0);
     (state as { turns: number }).turns = 40;
     const exposed = session.state;
     (exposed as { turns: number }).turns = 50;
@@ -329,6 +383,16 @@ describe("deterministic randomness and replay", () => {
     expect(() => RandomSeed.from(Number.MAX_SAFE_INTEGER + 1)).toThrow(
       RangeError,
     );
+
+    const source = new SeededRandom(RandomSeed.from(91));
+    source.nextU64();
+    const checkpoint = source.checkpoint();
+    const restored = new SeededRandom(RandomSeed.from(0));
+    restored.restore(checkpoint);
+    expect(restored.nextU64()).toBe(source.nextU64());
+    expect(() => {
+      restored.restore(1 as unknown as bigint);
+    }).toThrow(RangeError);
   });
 
   it("reconstructs identical state, outcomes, and events and continues snapshots", () => {
@@ -349,6 +413,10 @@ describe("deterministic randomness and replay", () => {
       actions,
       new SeededRandom(RandomSeed.from(19)),
     );
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(Object.isFrozen(first.transitions)).toBe(true);
+    expect(Object.isFrozen(first.transitions[0])).toBe(true);
+    expect(Object.isFrozen(first.transitions[0]?.events)).toBe(true);
     const secondFixture = fixture();
     const second = replay(
       reference(),
