@@ -25,7 +25,7 @@ jobs:
       - run: cargo test --all-targets --locked
       - run: cargo doc --no-deps --locked
       - run: cargo package --locked
-      - run: cargo test --manifest-path target/package/game-core-0.2.0/Cargo.toml --all-targets --locked
+      - run: cargo test --manifest-path target/package/game-core-0.3.0/Cargo.toml --all-targets --locked
 
   typescript:
     runs-on: ubuntu-latest

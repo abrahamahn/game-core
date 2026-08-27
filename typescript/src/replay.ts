@@ -10,10 +10,15 @@ import type {
 } from "./session.js";
 
 export class ReplayResult<State, Outcome, Event> {
+  public readonly transitions: readonly AppliedTransition<Event>[];
+
   public constructor(
     public readonly session: GameSession<State, Outcome>,
-    public readonly transitions: readonly AppliedTransition<Event>[],
-  ) {}
+    transitions: readonly AppliedTransition<Event>[],
+  ) {
+    this.transitions = Object.freeze([...transitions]);
+    Object.freeze(this);
+  }
 }
 
 export function replay<State, Action, Event, Outcome, Rejection, Checkpoint>(

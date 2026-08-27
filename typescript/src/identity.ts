@@ -16,7 +16,9 @@ export class IdentityError extends Error {
 }
 
 export class GameDefinitionKey {
-  private constructor(private readonly value: string) {}
+  private constructor(private readonly value: string) {
+    Object.freeze(this);
+  }
 
   public static parse(value: string): GameDefinitionKey {
     if (!isDefinitionKey(value)) {
@@ -31,7 +33,9 @@ export class GameDefinitionKey {
 }
 
 export class GameDefinitionVersion {
-  private constructor(private readonly value: string) {}
+  private constructor(private readonly value: string) {
+    Object.freeze(this);
+  }
 
   public static parse(value: string): GameDefinitionVersion {
     if (!isVersion(value)) {
@@ -49,7 +53,9 @@ export class GameDefinitionRef {
   private constructor(
     public readonly key: GameDefinitionKey,
     public readonly version: GameDefinitionVersion,
-  ) {}
+  ) {
+    Object.freeze(this);
+  }
 
   public static create(key: string, version: string): GameDefinitionRef {
     return new GameDefinitionRef(
@@ -60,7 +66,9 @@ export class GameDefinitionRef {
 }
 
 export class GameSessionId {
-  private constructor(private readonly value: string) {}
+  private constructor(private readonly value: string) {
+    Object.freeze(this);
+  }
 
   public static parse(value: string): GameSessionId {
     if (!isReferenceId(value)) {
@@ -78,7 +86,9 @@ export class GameSessionRef {
   private constructor(
     public readonly definition: GameDefinitionRef,
     public readonly sessionId: GameSessionId,
-  ) {}
+  ) {
+    Object.freeze(this);
+  }
 
   public static create(
     definition: GameDefinitionRef,
@@ -89,7 +99,9 @@ export class GameSessionRef {
 }
 
 export class GameResultId {
-  private constructor(private readonly value: string) {}
+  private constructor(private readonly value: string) {
+    Object.freeze(this);
+  }
 
   public static parse(value: string): GameResultId {
     if (!isReferenceId(value)) {
@@ -108,7 +120,9 @@ export class GameResultRef {
     public readonly session: GameSessionRef,
     public readonly resultId: GameResultId,
     public readonly version: number,
-  ) {}
+  ) {
+    Object.freeze(this);
+  }
 
   public static create(
     session: GameSessionRef,
@@ -137,9 +151,20 @@ function isVersion(value: string): boolean {
 
 function isReferenceId(value: string): boolean {
   return (
-    value.length > 0 &&
-    value.length <= MAX_REFERENCE_LENGTH &&
+    hasValidReferenceLength(value) &&
     value.trim() === value &&
-    !/[\u0000-\u001f\u007f]/.test(value)
+    !/[\p{Cc}\p{Cs}]/u.test(value)
   );
+}
+
+function hasValidReferenceLength(value: string): boolean {
+  let length = 0;
+  for (let index = 0; index < value.length; ) {
+    const codePoint = value.codePointAt(index);
+    if (codePoint === undefined) return false;
+    index += codePoint > 0xffff ? 2 : 1;
+    length += 1;
+    if (length > MAX_REFERENCE_LENGTH) return false;
+  }
+  return length > 0;
 }

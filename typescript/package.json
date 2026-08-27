@@ -1,6 +1,6 @@
 {
   "name": "@abrahamahn/game-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Deterministic, authoritative game-session primitives",
   "type": "module",
   "sideEffects": false,

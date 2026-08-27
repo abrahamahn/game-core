@@ -15,14 +15,15 @@ export class ParticipantError extends Error {
 }
 
 export class ParticipantId {
-  private constructor(private readonly value: string) {}
+  private constructor(private readonly value: string) {
+    Object.freeze(this);
+  }
 
   public static parse(value: string): ParticipantId {
     if (
-      value.length === 0 ||
-      value.length > MAX_PARTICIPANT_ID_LENGTH ||
+      !hasValidParticipantIdLength(value) ||
       value.trim() !== value ||
-      /[\u0000-\u001f\u007f]/.test(value)
+      /[\p{Cc}\p{Cs}]/u.test(value)
     ) {
       throw new ParticipantError("GAME_INVALID_PARTICIPANT_ID");
     }
@@ -40,7 +41,9 @@ export class Participant {
   public constructor(
     public readonly id: ParticipantId,
     public readonly status: ParticipantStatus = "active",
-  ) {}
+  ) {
+    Object.freeze(this);
+  }
 
   public get isActive(): boolean {
     return this.status === "active";
@@ -94,10 +97,22 @@ export class ParticipantRoster {
   }
 
   public values(): readonly Participant[] {
-    return [...this.#participants.values()];
+    return Object.freeze([...this.#participants.values()]);
   }
 
   public clone(): ParticipantRoster {
     return new ParticipantRoster(this.#participants.values());
   }
+}
+
+function hasValidParticipantIdLength(value: string): boolean {
+  let length = 0;
+  for (let index = 0; index < value.length; ) {
+    const codePoint = value.codePointAt(index);
+    if (codePoint === undefined) return false;
+    index += codePoint > 0xffff ? 2 : 1;
+    length += 1;
+    if (length > MAX_PARTICIPANT_ID_LENGTH) return false;
+  }
+  return length > 0;
 }

@@ -4,7 +4,9 @@ const GAMMA = 0x9e37_79b9_7f4a_7c15n;
 export const SEEDED_RANDOM_ALGORITHM = "splitmix64-v1" as const;
 
 export class RandomSeed {
-  private constructor(public readonly value: bigint) {}
+  private constructor(public readonly value: bigint) {
+    Object.freeze(this);
+  }
 
   public static from(value: bigint | number): RandomSeed {
     if (
@@ -69,7 +71,11 @@ export class SeededRandom implements TransactionalRandomSource<bigint> {
   }
 
   public restore(checkpoint: bigint): void {
-    if (checkpoint < 0n || checkpoint > MASK_64) {
+    if (
+      typeof checkpoint !== "bigint" ||
+      checkpoint < 0n ||
+      checkpoint > MASK_64
+    ) {
       throw new RangeError(
         "Random checkpoint must be an unsigned 64-bit integer",
       );
