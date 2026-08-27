@@ -1,6 +1,6 @@
 {
   "name": "@abrahamahn/game-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Deterministic, authoritative game-session primitives",
   "type": "module",
   "sideEffects": false,
@@ -41,9 +41,9 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "type-check": "pnpm typecheck",
-    "lint": "eslint src --max-warnings 0",
+    "lint": "eslint src tests --max-warnings 0",
     "test": "vitest run",
-    "prepack": "npm run build && npm run typecheck && npm run lint && npm test"
+    "prepack": "pnpm build && pnpm typecheck && pnpm lint && pnpm test"
   },
   "devDependencies": {
     "eslint": "^9.39.2",

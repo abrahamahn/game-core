@@ -12,6 +12,9 @@ timers, and outcomes belong to application-owned rule types.
 
 - Commands apply only to active sessions at the exact expected version.
 - Validation runs before randomness; a rejected action changes neither state nor the random stream.
+- Sessions clone application state and outcomes at every ownership boundary; callers and rules do
+  not receive mutable references to the authoritative aggregate.
+- A transition failure restores checkpointable randomness before propagating the failure.
 - An accepted action advances the version exactly once.
 - Terminal outcomes permanently finish a session.
 - Snapshots reject lifecycle/version/outcome combinations the core could not produce.
@@ -33,6 +36,7 @@ import {
   RandomSeed,
   SeededRandom,
   type GameRules,
+  type GameStateOwnership,
 } from '@abrahamahn/game-core';
 
 type State = { readonly count: number };
@@ -53,7 +57,11 @@ const rules: GameRules<State, Action, Event, Outcome, never> = {
 
 const definition = GameDefinitionRef.create('example.counter', '1.0.0');
 const reference = GameSessionRef.create(definition, 'session-1');
-const session = GameSession.create<State, Outcome>(reference, { count: 0 });
+const ownership: GameStateOwnership<State, Outcome> = {
+  cloneState: (state) => ({ ...state }),
+  cloneOutcome: (outcome) => ({ ...outcome }),
+};
+const session = GameSession.create<State, Outcome>(reference, { count: 0 }, ownership);
 session.start(GameVersion.ZERO);
 session.apply(
   rules,
@@ -64,8 +72,9 @@ session.apply(
 
 ## Integration and extension points
 
-Implement `GameRules` with application-owned types. Provide a `RandomSource` and persist snapshots
-and accepted actions through adapters outside this package. Serialization should rebuild through
+Implement `GameRules` with application-owned types. Provide a `TransactionalRandomSource` and a
+`GameStateOwnership` clone strategy, then persist snapshots and accepted actions through adapters
+outside this package. Serialization should rebuild through
 `GameSnapshot.create` so invalid persisted state fails closed. Storage atomicity, clocks, event
 sinks, HTTP, WebSocket, and framework integration stay in the application because their useful
 contracts depend on the chosen infrastructure.

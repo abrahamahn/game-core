@@ -1,7 +1,13 @@
 import { GameSession, GameVersion } from './session.js';
 import type { GameSessionRef } from './identity.js';
-import type { RandomSource } from './randomness.js';
-import type { AppliedTransition, GameAction, GameRules, GameSnapshot } from './session.js';
+import type { TransactionalRandomSource } from './randomness.js';
+import type {
+  AppliedTransition,
+  GameAction,
+  GameRules,
+  GameSnapshot,
+  GameStateOwnership,
+} from './session.js';
 
 export class ReplayResult<State, Outcome, Event> {
   public constructor(
@@ -10,32 +16,34 @@ export class ReplayResult<State, Outcome, Event> {
   ) {}
 }
 
-export function replay<State, Action, Event, Outcome, Rejection>(
+export function replay<State, Action, Event, Outcome, Rejection, Checkpoint>(
   reference: GameSessionRef,
   initialState: State,
+  ownership: GameStateOwnership<State, Outcome>,
   rules: GameRules<State, Action, Event, Outcome, Rejection>,
   actions: Iterable<GameAction<Action>>,
-  random: RandomSource,
+  random: TransactionalRandomSource<Checkpoint>,
 ): ReplayResult<State, Outcome, Event> {
-  const session = GameSession.create<State, Outcome>(reference, initialState);
+  const session = GameSession.create<State, Outcome>(reference, initialState, ownership);
   session.start(GameVersion.ZERO);
   return applyRecordedActions(session, rules, actions, random);
 }
 
-export function replayFromSnapshot<State, Action, Event, Outcome, Rejection>(
+export function replayFromSnapshot<State, Action, Event, Outcome, Rejection, Checkpoint>(
   snapshot: GameSnapshot<State, Outcome>,
+  ownership: GameStateOwnership<State, Outcome>,
   rules: GameRules<State, Action, Event, Outcome, Rejection>,
   actions: Iterable<GameAction<Action>>,
-  random: RandomSource,
+  random: TransactionalRandomSource<Checkpoint>,
 ): ReplayResult<State, Outcome, Event> {
-  return applyRecordedActions(GameSession.restore(snapshot), rules, actions, random);
+  return applyRecordedActions(GameSession.restore(snapshot, ownership), rules, actions, random);
 }
 
-function applyRecordedActions<State, Action, Event, Outcome, Rejection>(
+function applyRecordedActions<State, Action, Event, Outcome, Rejection, Checkpoint>(
   session: GameSession<State, Outcome>,
   rules: GameRules<State, Action, Event, Outcome, Rejection>,
   actions: Iterable<GameAction<Action>>,
-  random: RandomSource,
+  random: TransactionalRandomSource<Checkpoint>,
 ): ReplayResult<State, Outcome, Event> {
   const transitions: AppliedTransition<Event>[] = [];
   for (const action of actions) {

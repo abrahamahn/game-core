@@ -23,7 +23,13 @@ export interface RandomSource {
   nextIndex(upperExclusive: number): number;
 }
 
-export class SeededRandom implements RandomSource {
+/** Random source whose position can be restored when an action fails before commit. */
+export interface TransactionalRandomSource<Checkpoint = unknown> extends RandomSource {
+  checkpoint(): Checkpoint;
+  restore(checkpoint: Checkpoint): void;
+}
+
+export class SeededRandom implements TransactionalRandomSource<bigint> {
   #state: bigint;
 
   public constructor(seed: RandomSeed) {
@@ -50,6 +56,17 @@ export class SeededRandom implements RandomSource {
       const value = this.nextU64();
       if (value >= threshold) return Number(value % upper);
     }
+  }
+
+  public checkpoint(): bigint {
+    return this.#state;
+  }
+
+  public restore(checkpoint: bigint): void {
+    if (checkpoint < 0n || checkpoint > MASK_64) {
+      throw new RangeError('Random checkpoint must be an unsigned 64-bit integer');
+    }
+    this.#state = checkpoint;
   }
 }
 

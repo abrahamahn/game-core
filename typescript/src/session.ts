@@ -1,6 +1,6 @@
 import type { GameSessionRef } from './identity.js';
 import type { ParticipantId } from './participant.js';
-import type { RandomSource } from './randomness.js';
+import type { RandomSource, TransactionalRandomSource } from './randomness.js';
 
 export type GameStatus = 'created' | 'active' | 'finished';
 export type LifecycleOperation = 'start' | 'apply_action';
@@ -102,6 +102,12 @@ export interface GameRules<State, Action, Event, Outcome, Rejection> {
   ): GameTransition<State, Event, Outcome>;
 }
 
+/** Defines how a session takes exclusive ownership of application-defined state and outcomes. */
+export interface GameStateOwnership<State, Outcome> {
+  cloneState(state: Readonly<State>): State;
+  cloneOutcome(outcome: Readonly<Outcome>): Outcome;
+}
+
 export interface AppliedTransition<Event> {
   readonly priorVersion: GameVersion;
   readonly nextVersion: GameVersion;
@@ -114,6 +120,7 @@ export class GameSession<State, Outcome> {
   #status: GameStatus;
   #state: State;
   #outcome: Outcome | undefined;
+  readonly #ownership: GameStateOwnership<State, Outcome>;
 
   private constructor(
     public readonly reference: GameSessionRef,
@@ -121,16 +128,19 @@ export class GameSession<State, Outcome> {
     status: GameStatus,
     state: State,
     outcome: Outcome | undefined,
+    ownership: GameStateOwnership<State, Outcome>,
   ) {
     this.#version = version;
     this.#status = status;
-    this.#state = state;
-    this.#outcome = outcome;
+    this.#ownership = ownership;
+    this.#state = ownership.cloneState(state);
+    this.#outcome = outcome === undefined ? undefined : ownership.cloneOutcome(outcome);
   }
 
   public static create<State, Outcome = never>(
     reference: GameSessionRef,
     initialState: State,
+    ownership: GameStateOwnership<State, Outcome>,
   ): GameSession<State, Outcome> {
     return new GameSession<State, Outcome>(
       reference,
@@ -138,11 +148,13 @@ export class GameSession<State, Outcome> {
       'created',
       initialState,
       undefined,
+      ownership,
     );
   }
 
   public static restore<State, Outcome>(
     snapshot: GameSnapshot<State, Outcome>,
+    ownership: GameStateOwnership<State, Outcome>,
   ): GameSession<State, Outcome> {
     snapshot.validate();
     return new GameSession(
@@ -151,6 +163,7 @@ export class GameSession<State, Outcome> {
       snapshot.status,
       snapshot.state,
       snapshot.outcome,
+      ownership,
     );
   }
 
@@ -163,11 +176,11 @@ export class GameSession<State, Outcome> {
   }
 
   public get state(): Readonly<State> {
-    return this.#state;
+    return this.#ownership.cloneState(this.#state);
   }
 
   public get outcome(): Readonly<Outcome> | undefined {
-    return this.#outcome;
+    return this.#outcome === undefined ? undefined : this.#ownership.cloneOutcome(this.#outcome);
   }
 
   public start(expectedVersion: GameVersion): GameVersion {
@@ -181,10 +194,10 @@ export class GameSession<State, Outcome> {
     return nextVersion;
   }
 
-  public apply<Action, Event, Rejection>(
+  public apply<Action, Event, Rejection, Checkpoint>(
     rules: GameRules<State, Action, Event, Outcome, Rejection>,
     action: GameAction<Action>,
-    random: RandomSource,
+    random: TransactionalRandomSource<Checkpoint>,
   ): AppliedTransition<Event> {
     try {
       this.ensureVersion(action.expectedVersion);
@@ -197,16 +210,39 @@ export class GameSession<State, Outcome> {
         actor: action.actor,
         version: this.#version,
       };
-      const validation = rules.validate(context, this.#state, action.payload);
+      const validation = rules.validate(
+        context,
+        this.#ownership.cloneState(this.#state),
+        action.payload,
+      );
       if (!validation.accepted) {
         throw GameExecutionError.rejected(validation.rejection);
       }
-      const transition = rules.transition(context, this.#state, action.payload, random);
+      const checkpoint = random.checkpoint();
+      let transition: GameTransition<State, Event, Outcome>;
+      let ownedState: State;
+      let ownedOutcome: Outcome | undefined;
+      try {
+        transition = rules.transition(
+          context,
+          this.#ownership.cloneState(this.#state),
+          action.payload,
+          random,
+        );
+        ownedState = this.#ownership.cloneState(transition.state);
+        ownedOutcome =
+          transition.kind === 'finish'
+            ? this.#ownership.cloneOutcome(transition.outcome)
+            : undefined;
+      } catch (error: unknown) {
+        random.restore(checkpoint);
+        throw error;
+      }
       const priorVersion = this.#version;
-      this.#state = transition.state;
+      this.#state = ownedState;
       this.#version = nextVersion;
       if (transition.kind === 'finish') {
-        this.#outcome = transition.outcome;
+        this.#outcome = ownedOutcome;
         this.#status = 'finished';
       }
       return {
@@ -222,13 +258,13 @@ export class GameSession<State, Outcome> {
     }
   }
 
-  public snapshot(cloneState: (state: Readonly<State>) => State): GameSnapshot<State, Outcome> {
+  public snapshot(): GameSnapshot<State, Outcome> {
     return GameSnapshot.create(
       this.reference,
       this.#version,
       this.#status,
-      cloneState(this.#state),
-      this.#outcome,
+      this.#ownership.cloneState(this.#state),
+      this.#outcome === undefined ? undefined : this.#ownership.cloneOutcome(this.#outcome),
     );
   }
 

@@ -24,6 +24,7 @@ export {
   SeededRandom,
   shuffle,
   type RandomSource,
+  type TransactionalRandomSource,
 } from './randomness.js';
 export { replay, replayFromSnapshot, ReplayResult } from './replay.js';
 export {
@@ -41,6 +42,7 @@ export {
   type ActionRejection,
   type AppliedTransition,
   type GameRules,
+  type GameStateOwnership,
   type GameStatus,
   type GameTransition,
   type LifecycleOperation,
