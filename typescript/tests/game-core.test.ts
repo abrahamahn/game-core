@@ -70,10 +70,9 @@ class Rules implements GameRules<State, Action, Event, Outcome, Rejection> {
   public transition(
     context: Readonly<ActionContext>,
     state: Readonly<State>,
-    action: Readonly<Action>,
+    _action: Readonly<Action>,
     random: RandomSource,
   ): GameTransition<State, Event, Outcome> {
-    void action;
     const value = random.nextIndex(6) + 1;
     const next: State = {
       roster: state.roster.clone(),
